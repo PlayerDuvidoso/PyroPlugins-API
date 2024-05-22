@@ -1,20 +1,23 @@
-from pyrodb import *
+import pyrodb
 from models.models import * 
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import HTTPException, Depends, status
 from decouple import config
+from fastapi.security import OAuth2PasswordBearer
 
 # --> Secrets <--
 SECRET_KEY = config("SECRET_KEY")
 ALGORITHM = config("ALGORITHM")
-ACESS_TOKEN_EXPIRE_MINUTES = config("ACESS_TOKEN_EXPIRE_MINUTES")
+ACESS_TOKEN_EXPIRE_MINUTES = int(config("ACESS_TOKEN_EXPIRE_MINUTES"))
 
-def authenticate_user(db, username: str, password: str):
-    user = get_user(db, username)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="signin")
+
+def authenticate_user(email: str, password: str):
+    user = pyrodb.get_user(email)
     if not user:
         return False
-    if not verify_password(password, user.hashed_password):
+    if not pyrodb.verify_password(password, user.hashed_password):
         return False
     return user
 
@@ -32,19 +35,18 @@ def create_access_token(data: dict, expires_delta: timedelta or None = None): #t
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credential_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                          detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
-    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credential_exception
         
-        token_data = TokenData(username=username)
+        token_data = TokenData(email=email)
     
     except JWTError:
         raise credential_exception
     
-    user = get_user(db, username=token_data.username)
+    user = pyrodb.get_user(email=token_data.email)
     if user is None:
         raise credential_exception
     

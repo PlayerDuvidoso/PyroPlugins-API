@@ -1,18 +1,26 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
-# --> Authentication Models <--
+# --> Token Models <--
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 class TokenData(BaseModel):
-    username: str or None = None #type: ignore
+    email: str or None = None #type: ignore
 
+
+# --> User Models <--
 class User(BaseModel):
     username: str
-    email: str or None = None #type: ignore
-    full_name: str or None = None #type: ignore
-    disabled: bool or None = None #type: ignore
+    email: EmailStr or None = None #type: ignore
+    disabled: Optional[bool] = False
 
 class UserInDB(User):
     hashed_password: str
+
+class UserInSignup(User):
+    password: str
+
+class UserAdmin(User):
+    isAdmin: Optional[bool]=False
