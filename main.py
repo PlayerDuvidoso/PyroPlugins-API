@@ -4,6 +4,7 @@ from datetime import timedelta
 from models.models import *
 import pyrodb
 from auth.auth import *
+import os
 
 
 app = FastAPI()
@@ -34,17 +35,21 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 # --> File Handling Routes <--
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    
-    fileloc = "temp/" + file.filename.replace(" ", "_")
-    #try:
-    with open(fileloc, 'wb+') as f:
-        while contents := file.file.read(2048 * 2048):
-            f.write(contents)
-        f.close()
-    #except Exception as e:
-    #    return {"error": e}
-    #finally:
-    file.file.close()
-    print("File was cached!")
-    pyrodb.add_file(file.filename.replace(" ", "_"))
+    if not os.path.exists("CachedUploads"):
+        os.mkdir("CachedUploads")
+    fileloc = "CachedUploads/" + file.filename.replace(" ", "_")
+    try:
+        with open(fileloc, 'wb+') as f:
+            while contents := file.file.read(2048 * 2048):
+                f.write(contents)
+            f.close()
+    except Exception:
+        return {"error": "Something went wrong while uploading file!"}
+    finally:
+        file.file.close()
+        pyrodb.add_file(file.filename.replace(" ", "_"))
     return {"message": f"Successfully uploaded {file.filename}"}
+
+@app.get("/download")
+async def download(filename: str):
+    pyrodb.get_file(filename)

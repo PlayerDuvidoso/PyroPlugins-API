@@ -3,7 +3,7 @@ from pymongo.mongo_client import MongoClient
 from passlib.context import CryptContext
 from models.models import *
 from gridfs import GridFS
-from os import remove
+from os import remove, path, mkdir
 
 # --> MongoDB Stuff <--
 uri = config("URI_LINK")
@@ -37,11 +37,26 @@ def add_user(username: str, email: str, password: str, disabled: bool = False):
     users.insert_one(user)
     return True
 
+
 # --> File Handling <--
 def add_file(filename):
-    temp = f'temp/{filename}'
+    temp = f'CachedUploads/{filename}'
     file = open(temp, 'rb+')
     fs.put(file, filename=filename)
     file.close()
     remove(temp)
-    print("File was Uploaded Successfully!")
+
+def get_file(filename: str):
+
+    if not path.exists('CachedDownloads'):
+        mkdir("CachedDownloads")
+
+    data = db['Files.files'].find_one({"filename": filename.replace(" ", "_")})
+    fs_id = data['_id']
+    out_data = fs.get(fs_id).read()
+
+    with open(f"CachedDownloads/{filename}", "wb+") as output:
+        output.write(out_data)
+        output.close()
+    
+    print(f"{output.name} Downloaded!")
