@@ -3,7 +3,8 @@ from pymongo.mongo_client import MongoClient
 from passlib.context import CryptContext
 from models.models import *
 from gridfs import GridFS
-from os import remove, path, mkdir
+from os import remove, path, mkdir, scandir
+from shutil import rmtree
 import pendulum
 
 # --> MongoDB Stuff <--
@@ -66,10 +67,18 @@ def add_file(fileloc: str, filename: str, uuid: str, user_email: str):
 # --> File Download Handle <--
 def get_file(identifier: str):
 
-    if not path.exists('CachedDownloads'):
-        mkdir("CachedDownloads")
+    # --> Check if there is leftover cache if server was restarted/crashed
+    if len(cache) == 0:
+        try:
+            with scandir('CachedDownloads') as it:
+                if any(it):
+                    rmtree("CachedDownloads")     
+                    mkdir("CachedDownloads")  
+        except:
+            mkdir("CachedDownloads")
 
 
+    # --> Getting File Info
     data = files.find_one({"identifier": identifier})
     fs_id = data['_id']
     filename = data['filename']
@@ -79,15 +88,11 @@ def get_file(identifier: str):
     # --> Check if file is already in cache
     for i, file in enumerate(cache):
 
-        if pendulum.now() >= file['expiry']:
+        if pendulum.now() >= file['expiry']: # Clears Expired cache
             cache.pop(i)
             remove(file['path'])
-            print(f'{file['filename']} was removed from cache!')
 
-        if identifier == file['identifier'] and pendulum.now() < file['expiry']:
-            
-            print(f"{file['filename']} was found in cache!")
-            
+        if identifier == file['identifier'] and pendulum.now() < file['expiry']: # If file isn't expired and cached returns it to server       
             files.update_one({"identifier": identifier}, {"$set": {"total_downloads": total_downloads}})
             return DownloadInfo(path=file['path'], name=file['filename']).model_dump()
 
@@ -101,7 +106,5 @@ def get_file(identifier: str):
     
     to_cache = DownloadCache(identifier=identifier, filename=filename, path=output.name, expiry=(pendulum.now() + pendulum.duration(minutes=cache_duration))).model_dump()
     cache.append(to_cache)
-    print(f'{filename} was cached!')
-
 
     return DownloadInfo(path=output.name, name=filename).model_dump()

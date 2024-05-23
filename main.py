@@ -20,17 +20,12 @@ def signup_for_account(form_data: UserInSignup):
 
     if len(form_data['password']) > 31 or len(form_data['password']) <= 7:
         raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
-    
-    if not str(form_data['email']).isalnum():
-        raise HTTPException(400, detail="Your email must contain only valid characters!")
 
     try:
         if pyrodb.add_user(**form_data):
-            print("Deu bom")
             return {"status": "Registered Succesfully!"}
         return {"status": "Email in already in use!"}
     except:
-        print("deu erro")
         return {"status": "Please insert valid information!"}
 
     
@@ -93,8 +88,8 @@ async def upload(file: UploadFile = File(...), user: User = Depends(get_current_
 async def download(identifier: str) -> FileResponse:
 
 
-    #try:
-    download = pyrodb.get_file(identifier)
-    return(FileResponse(download['path'], filename=download['name'], media_type='application/java-archive'))
-    #except:
-    #    raise HTTPException(400, detail="Couldn't download this file, check if the identifier is correct!")
+    try:
+        download = pyrodb.get_file(identifier)
+        return(FileResponse(download['path'], filename=download['name'], media_type='application/java-archive'))
+    except:
+        raise HTTPException(400, detail="Couldn't download this file, check if the identifier is correct!")
