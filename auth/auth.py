@@ -5,6 +5,7 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, Depends, status
 from decouple import config
 from fastapi.security import OAuth2PasswordBearer
+from pydantic import EmailStr
 
 # --> Secrets <--
 SECRET_KEY = config("SECRET_KEY")
@@ -13,11 +14,14 @@ ACESS_TOKEN_EXPIRE_MINUTES = int(config("ACESS_TOKEN_EXPIRE_MINUTES"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="signin")
 
-def authenticate_user(email: str, password: str):
+def authenticate_user(email: EmailStr, password: str):
     user = pyrodb.get_user(email)
     if not user:
         return False
-    if not pyrodb.verify_password(password, user.hashed_password):
+    try:
+        if not pyrodb.verify_password(password, user.hashed_password):
+            return False
+    except:
         return False
     return user
 

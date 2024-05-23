@@ -4,6 +4,7 @@ from passlib.context import CryptContext
 from models.models import *
 from gridfs import GridFS
 from os import remove, path, mkdir
+import pendulum
 
 # --> MongoDB Stuff <--
 uri = config("URI_LINK")
@@ -12,6 +13,11 @@ db = db_con["PyroDB"]
 fs = GridFS(db, "Files")
 users = db["Users"]
 files = db["Files.files"]
+
+
+# --> Cache <--
+cache_duration = float(config("CACHE_EXPIRE_MINUTES"))
+cache = []
 
 
 # --> Encryption <--
@@ -50,7 +56,6 @@ def append_plugin_to_owner(user_email: str, plugin_identifier: str):
 
 # --> File Upload Handle <--
 def add_file(fileloc: str, filename: str, uuid: str, user_email: str):
-    #print(f"\n-=-=-=-\nPyroDB: File Upload requested!\nOwner: {user_email}\nIdentifier: {uuid}\nFilename: {filename}\n-=-=-=-\n")
     file = open(fileloc, 'rb+')
     fs.put(file, filename=filename, owner=user_email, identifier=uuid , total_downloads=0)
     file.close()
@@ -64,16 +69,39 @@ def get_file(identifier: str):
     if not path.exists('CachedDownloads'):
         mkdir("CachedDownloads")
 
+
     data = files.find_one({"identifier": identifier})
     fs_id = data['_id']
     filename = data['filename']
-    out_data = fs.get(fs_id).read()
     total_downloads = int(data['total_downloads']) + 1
+    
 
-    with open(f"CachedDownloads/{filename}", "wb+") as output:
+    # --> Check if file is already in cache
+    for i, file in enumerate(cache):
+
+        if pendulum.now() >= file['expiry']:
+            cache.pop(i)
+            remove(file['path'])
+            print(f'{file['filename']} was removed from cache!')
+
+        if identifier == file['identifier'] and pendulum.now() < file['expiry']:
+            
+            print(f"{file['filename']} was found in cache!")
+            
+            files.update_one({"identifier": identifier}, {"$set": {"total_downloads": total_downloads}})
+            return DownloadInfo(path=file['path'], name=file['filename']).model_dump()
+
+    # --> If file isn't cached, get from DB and cache it
+    out_data = fs.get(fs_id).read()
+    with open(f"CachedDownloads/{identifier}.jar", "wb+") as output:
         output.write(out_data)
         output.close()
 
     files.update_one({"identifier": identifier}, {"$set": {"total_downloads": total_downloads}})
     
-    return DownloadInfo(download_path=output.name, download_name=filename).model_dump()
+    to_cache = DownloadCache(identifier=identifier, filename=filename, path=output.name, expiry=(pendulum.now() + pendulum.duration(minutes=cache_duration))).model_dump()
+    cache.append(to_cache)
+    print(f'{filename} was cached!')
+
+
+    return DownloadInfo(path=output.name, name=filename).model_dump()

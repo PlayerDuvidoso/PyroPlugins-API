@@ -13,21 +13,44 @@ app = FastAPI()
 
 
 # --> Authentication Routes <--
-@app.post("/signin", response_model=Token, tags=["authentication"])
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or passowrd", headers={"WWW-Authenticate": "Bearer"})
-    
-    access_token_expires = timedelta(minutes=ACESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
-
 @app.post("/signup", tags=["authentication"])
 def signup_for_account(form_data: UserInSignup):
-    if pyrodb.add_user(**form_data.model_dump()):
-        return {"status": "Registered Succesfully!"}
-    return {"status": "Please insert valid information!"}
+
+    form_data = form_data.model_dump()
+
+    if len(form_data['password']) > 31 or len(form_data['password']) <= 7:
+        raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
+    
+    if not str(form_data['email']).isalnum():
+        raise HTTPException(400, detail="Your email must contain only valid characters!")
+
+    try:
+        if pyrodb.add_user(**form_data):
+            print("Deu bom")
+            return {"status": "Registered Succesfully!"}
+        return {"status": "Email in already in use!"}
+    except:
+        print("deu erro")
+        return {"status": "Please insert valid information!"}
+
+    
+@app.post("/signin", response_model=Token, tags=["authentication"])
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+
+    if len(form_data.password) > 31 or len(form_data.password) <= 7:
+        raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
+
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password", headers={"WWW-Authenticate": "Bearer"})
+    
+    access_token_expires = timedelta(minutes=ACESS_TOKEN_EXPIRE_MINUTES)
+    try:
+        access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    except:
+        raise HTTPException(400, detail="Invalid email or password, make sure your credentials are correct")
+    return {"access_token": access_token, "token_type": "bearer"}
+
 
 
 @app.get("/users/me", response_model=User)
@@ -70,8 +93,8 @@ async def upload(file: UploadFile = File(...), user: User = Depends(get_current_
 async def download(identifier: str) -> FileResponse:
 
 
-    try:
-        download = pyrodb.get_file(identifier)
-        return(FileResponse(download['download_path'], filename=download['download_name'], media_type='application/octet-stream'))
-    except:
-        raise HTTPException(400, detail="Couldn't download this file, check if the identifier is correct!")
+    #try:
+    download = pyrodb.get_file(identifier)
+    return(FileResponse(download['path'], filename=download['name'], media_type='application/java-archive'))
+    #except:
+    #    raise HTTPException(400, detail="Couldn't download this file, check if the identifier is correct!")

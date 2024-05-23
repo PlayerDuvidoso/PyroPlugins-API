@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import datetime
 
 # --> Token Models <--
 class Token(BaseModel):
@@ -15,9 +16,11 @@ class User(BaseModel):
     username: str
     email: EmailStr or None = None #type: ignore
     disabled: Optional[bool] = False
+    
+class UserPlugins(User):
     plugins: Optional[list] = []
 
-class UserInDB(User):
+class UserInDB(UserPlugins):
     hashed_password: str
 
 class UserInSignup(User):
@@ -27,7 +30,13 @@ class UserAdmin(User):
     isAdmin: Optional[bool]=False
 
 
-# --> Plugin Download Models <--
+# --> Plugin Management Models <--
 class DownloadInfo(BaseModel):
-    download_path: str
-    download_name: str
+    path: str
+    name: str
+
+class DownloadCache(BaseModel):
+    identifier: str
+    filename: str
+    path: str
+    expiry: datetime
