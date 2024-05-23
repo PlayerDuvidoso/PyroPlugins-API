@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from models.models import *
 import pyrodb
 from auth.auth import *
 import os
+from uuid import uuid4
 
 
 app = FastAPI()
@@ -27,17 +29,29 @@ def signup_for_account(form_data: UserInSignup):
         return {"status": "Registered Succesfully!"}
     return {"status": "Please insert valid information!"}
 
+
 @app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
-# --> File Handling Routes <--
+# --> File Upload Handle <--
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), user: User = Depends(get_current_active_user)):
+
+    user_email = user.model_dump()['email']
+
+    # --> Creating a Unique File
+    file_uuid = str(uuid4())
+    fileloc = "CachedUploads/" + file_uuid +".jar"
+
+    if file.filename[-4::] != '.jar':
+        raise HTTPException(400, detail="Content must be a java (.jar) file")
+
     if not os.path.exists("CachedUploads"):
         os.mkdir("CachedUploads")
-    fileloc = "CachedUploads/" + file.filename.replace(" ", "_")
+
+
     try:
         with open(fileloc, 'wb+') as f:
             while contents := file.file.read(2048 * 2048):
@@ -47,9 +61,17 @@ async def upload(file: UploadFile = File(...)):
         return {"error": "Something went wrong while uploading file!"}
     finally:
         file.file.close()
-        pyrodb.add_file(file.filename.replace(" ", "_"))
+        pyrodb.add_file(fileloc, file.filename, file_uuid, user_email)
     return {"message": f"Successfully uploaded {file.filename}"}
 
+
+# --> File Download Handle <--
 @app.get("/download")
-async def download(filename: str):
-    pyrodb.get_file(filename)
+async def download(identifier: str) -> FileResponse:
+
+
+    try:
+        download = pyrodb.get_file(identifier)
+        return(FileResponse(download['download_path'], filename=download['download_name'], media_type='application/octet-stream'))
+    except:
+        raise HTTPException(400, detail="Couldn't download this file, check if the identifier is correct!")

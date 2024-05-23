@@ -15,6 +15,7 @@ class User(BaseModel):
     username: str
     email: EmailStr or None = None #type: ignore
     disabled: Optional[bool] = False
+    plugins: Optional[list] = []
 
 class UserInDB(User):
     hashed_password: str
@@ -24,3 +25,9 @@ class UserInSignup(User):
 
 class UserAdmin(User):
     isAdmin: Optional[bool]=False
+
+
+# --> Plugin Download Models <--
+class DownloadInfo(BaseModel):
+    download_path: str
+    download_name: str
