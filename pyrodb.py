@@ -1,11 +1,13 @@
 from decouple import config
+from fastapi import HTTPException, UploadFile
 from pymongo.mongo_client import MongoClient
 from passlib.context import CryptContext
 from models.models import *
 from gridfs import GridFS
-from os import remove, path, mkdir, scandir
+from os import remove, mkdir, scandir, path
 from shutil import rmtree
 import pendulum
+from uuid import uuid4
 
 # --> MongoDB Stuff <--
 uri = config("URI_LINK")
@@ -14,6 +16,7 @@ db = db_con["PyroDB"]
 fs = GridFS(db, "Files")
 users = db["Users"]
 files = db["Files.files"]
+posts = db["Posts"]
 
 
 # --> Cache <--
@@ -32,12 +35,12 @@ def get_password_hash(password):
 
 
 # --> User Handling <--
-def get_user(email: str):
+def get_user(email: str) -> UserInDB:
     user = users.find_one({'email': email})
     if user:
         return UserInDB(**user)
 
-def add_user(username: str, email: str, password: str, disabled: bool = False, plugins: str = []):
+def add_user(username: str, email: str, password: str, disabled: bool = False):
     hashed_password = get_password_hash(password)
     user = UserInDB(username=username, email=email, hashed_password=hashed_password, disabled=disabled).model_dump()
     if users.find_one({"email": user['email']}):
@@ -45,23 +48,47 @@ def add_user(username: str, email: str, password: str, disabled: bool = False, p
     users.insert_one(user)
     return True
 
-def append_plugin_to_owner(user_email: str, plugin_identifier: str):
+def append_post_to_owner(user_email: str, post_identifier: str):
     user = users.find_one({'email': user_email})
     if user:
-        user_plugins: list = user['plugins']
-        user_plugins.append(plugin_identifier)
-        users.update_one({'email': user_email}, {'$set': {'plugins': user_plugins}})
+        user_posts: list = user['posts']
+        user_posts.append(post_identifier)
+        users.update_one({'email': user_email}, {'$set': {'posts': user_posts}})
     else:
-        raise Exception("Couldn't append plugin to the user")
+        raise HTTPException(400, "Couldn't append post to the user")
 
 
-# --> File Upload Handle <--
-def add_file(fileloc: str, filename: str, uuid: str, user_email: str):
-    file = open(fileloc, 'rb+')
-    fs.put(file, filename=filename, owner=user_email, identifier=uuid , total_downloads=0)
-    file.close()
-    append_plugin_to_owner(user_email, uuid)
-    remove(fileloc)
+# --> Post Handling <--
+def create_post(post: Post, user_email: str) -> str:
+    identifier = str(uuid4())
+    post_to_create = PostInDB(identifier=identifier, owner=user_email, **post.model_dump()).model_dump()
+    
+    posts.insert_one(post_to_create)
+    append_post_to_owner(user_email, identifier)
+
+    return identifier
+
+
+def create_post_plugin(identifier: str, user_email: str, file: UploadFile):
+    if not path.exists("CachedUploads"):
+        mkdir("CachedUploads")
+    
+    fileloc = "CachedUploads/"+identifier+".jar"
+
+    plugin = PluginInDB(filename=file.filename, owner=user_email, identifier=identifier, total_downloads=0).model_dump()
+    
+    try:
+        with open(fileloc, 'wb+') as f:
+            while contents := file.file.read(1024 * 1024):
+                f.write(contents)                
+            f.close()
+        file.file.close()
+        fs.put(open(fileloc, 'rb+'), **plugin)
+        remove(fileloc)
+
+    except:
+        raise HTTPException(400, detail="Something went wrong while uploading file!")
+
 
 
 # --> File Download Handle <--

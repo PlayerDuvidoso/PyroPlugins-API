@@ -1,12 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from models.models import *
 import pyrodb
 from auth.auth import *
-import os
-from uuid import uuid4
 
 
 app = FastAPI()
@@ -18,19 +16,23 @@ def signup_for_account(form_data: UserInSignup):
 
     form_data = form_data.model_dump()
 
+    #TODO: --> VALIDATION
+
     if len(form_data['password']) > 31 or len(form_data['password']) <= 7:
         raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
 
     try:
         if pyrodb.add_user(**form_data):
-            return {"status": "Registered Succesfully!"}
-        return {"status": "Email in already in use!"}
+            return {"status": 200, "detail": "Registered Succesfully!"}
+        raise HTTPException(400, detail="Email in already in use!")
     except:
-        return {"status": "Please insert valid information!"}
+        raise HTTPException(400, detail="Please insert valid information!")
 
     
 @app.post("/signin", response_model=Token, tags=["authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+
+    #TODO: --> VALIDATION
 
     if len(form_data.password) > 31 or len(form_data.password) <= 7:
         raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
@@ -53,40 +55,35 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
-# --> File Upload Handle <--
-@app.post("/upload")
-async def upload(file: UploadFile = File(...), user: User = Depends(get_current_active_user)):
+# --> Post Creation <-- #TODO: Unmerge File Upload from Create Post
+@app.post("/create_post")
+async def create_post(post_info: Post, user: User = Depends(get_current_active_user)) -> dict:
+
+    #TODO: --> VALIDATION
 
     user_email = user.model_dump()['email']
 
-    # --> Creating a Unique File
-    file_uuid = str(uuid4())
-    fileloc = "CachedUploads/" + file_uuid +".jar"
+    post_id = pyrodb.create_post(post_info, user_email)
+    return {"status": 200, "detail": "Post created succesfully", "post_id": post_id}
+
+
+@app.post("/create_post/{identifier}/upload")
+async def upload_post_file(identifier: str, file: UploadFile = File(...), user: User = Depends(get_current_active_user)) -> dict:
+
+    user_email = user.model_dump()['email']
+
+    #TODO: --> VALIDATION
 
     if file.filename[-4::] != '.jar':
-        raise HTTPException(400, detail="Content must be a java (.jar) file")
-
-    if not os.path.exists("CachedUploads"):
-        os.mkdir("CachedUploads")
-
-
-    try:
-        with open(fileloc, 'wb+') as f:
-            while contents := file.file.read(2048 * 2048):
-                f.write(contents)
-            f.close()
-    except Exception:
-        return {"error": "Something went wrong while uploading file!"}
-    finally:
-        file.file.close()
-        pyrodb.add_file(fileloc, file.filename, file_uuid, user_email)
-    return {"message": f"Successfully uploaded {file.filename}"}
+        raise HTTPException(400, detail="The file must be a jar")
+    
+    pyrodb.create_post_plugin(identifier, user_email, file)
+    return {"status": 200, "detail": "File added to the post succesfully"}
 
 
 # --> File Download Handle <--
-@app.get("/download")
+@app.get("/download/{identifier}")
 async def download(identifier: str) -> FileResponse:
-
 
     try:
         download = pyrodb.get_file(identifier)

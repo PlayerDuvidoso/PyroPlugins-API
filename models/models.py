@@ -15,22 +15,26 @@ class TokenData(BaseModel):
 class User(BaseModel):
     username: str
     email: EmailStr or None = None #type: ignore
-    disabled: Optional[bool] = False
-    
-class UserPlugins(User):
-    plugins: Optional[list] = []
 
-class UserInDB(UserPlugins):
+class UserInDB(User):
+    posts: Optional[list] = []
+    isAdmin: Optional[bool] = False
+    disabled: Optional[bool] = False
     hashed_password: str
 
 class UserInSignup(User):
     password: str
 
-class UserAdmin(User):
-    isAdmin: Optional[bool]=False
 
 
-# --> Plugin Management Models <--
+# --> Plugin File Models <--
+class PluginInDB(BaseModel):
+    filename: str
+    owner: EmailStr
+    identifier: str
+    total_downloads: int
+
+
 class DownloadInfo(BaseModel):
     path: str
     name: str
@@ -40,3 +44,18 @@ class DownloadCache(BaseModel):
     filename: str
     path: str
     expiry: datetime
+
+
+# --> Post Models <--
+class Post(BaseModel):
+    title: str
+    about: str
+    image_link: str
+    plugin_version: int
+    supported_versions: list[str]
+    description: str
+
+class PostInDB(Post):
+    owner: EmailStr
+    identifier: str
+    
