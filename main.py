@@ -80,7 +80,7 @@ async def upload_post_file(identifier: str, file: UploadFile = File(...), user: 
     pyrodb.create_post_plugin(identifier, user_email, file)
     return {"status": 200, "detail": "File added to the post succesfully"}
 
-# TEst
+
 # --> File Download Handle <--
 @app.get("/download/{identifier}")
 async def download(identifier: str) -> FileResponse:
