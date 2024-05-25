@@ -40,9 +40,10 @@ def get_user(email: str) -> UserInDB:
     if user:
         return UserInDB(**user)
 
-def add_user(username: str, email: str, password: str, disabled: bool = False):
+def add_user(username: str, email: str, password: str):
     hashed_password = get_password_hash(password)
-    user = UserInDB(username=username, email=email, hashed_password=hashed_password, disabled=disabled).model_dump()
+    key = str(uuid4())
+    user = UserInDB(username=username, email=email, key=key, hashed_password=hashed_password).model_dump()
     if users.find_one({"email": user['email']}):
         return False
     users.insert_one(user)
@@ -56,6 +57,10 @@ def append_post_to_owner(user_email: str, post_identifier: str):
         users.update_one({'email': user_email}, {'$set': {'posts': user_posts}})
     else:
         raise HTTPException(400, "Couldn't append post to the user")
+    
+def verify_user(key) -> None:
+    users.update_one({"key": key}, {"$set": {'isVerified': True}})
+
 
 
 # --> Post Handling <--

@@ -60,6 +60,23 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@app.post("/verify_user/{key}", tags=["authentication"])
+async def verify_user(key: str, user: User = Depends(get_current_active_user)):
+
+    user_data = user.model_dump()
+    user_key = user_data["key"]
+
+    if isVerified := user_data["isVerified"]:
+        raise HTTPException(400, detail="User already verified!")
+    
+    if key == user_key:
+        pyrodb.verify_user(key)
+        return {"status": 200, "detail": "User verified successfully"}
+    
+    raise HTTPException(400, detail="Invalid key")
+
+
+
 
 @app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):

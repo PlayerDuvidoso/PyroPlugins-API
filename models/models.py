@@ -20,6 +20,8 @@ class UserInDB(User):
     posts: Optional[list] = []
     isAdmin: Optional[bool] = False
     disabled: Optional[bool] = False
+    isVerified: Optional[bool] = False
+    key: str
     hashed_password: str
 
 class UserInSignup(User):
