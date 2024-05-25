@@ -123,6 +123,7 @@ def get_file(identifier: str):
             files.update_one({"identifier": identifier}, {"$set": {"total_downloads": total_downloads}})
             return DownloadInfo(path=file['path'], name=file['filename']).model_dump()
 
+    
     # --> If file isn't cached, get from DB and cache it
     out_data = fs.get(fs_id).read()
     with open(f"CachedDownloads/{identifier}.jar", "wb+") as output:

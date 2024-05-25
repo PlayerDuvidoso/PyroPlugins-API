@@ -5,9 +5,11 @@ from datetime import timedelta
 from models.models import *
 import pyrodb
 from auth.auth import *
+from validation.validator import Validate
 
 
 app = FastAPI()
+validate = Validate()
 
 
 # --> Authentication Routes <--
@@ -16,10 +18,11 @@ def signup_for_account(form_data: UserInSignup):
 
     form_data = form_data.model_dump()
 
-    #TODO: --> VALIDATION
+    if v := validate.email(form_data["email"]):
+        raise HTTPException(400, detail=v)
 
-    if len(form_data['password']) > 31 or len(form_data['password']) <= 7:
-        raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
+    if v := validate.password(form_data['password']):
+        raise HTTPException(400, detail=v)
 
     try:
         if pyrodb.add_user(**form_data):
@@ -32,10 +35,15 @@ def signup_for_account(form_data: UserInSignup):
 @app.post("/signin", response_model=Token, tags=["authentication"])
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
 
-    #TODO: --> VALIDATION
+    email: str = form_data.username
+    password: str = form_data.password
 
-    if len(form_data.password) > 31 or len(form_data.password) <= 7:
-        raise HTTPException(400, detail="Password must have between 8 and 32 characters!")
+    if v := validate.email(email):
+        raise HTTPException(400, detail=v)
+
+    if v := validate.password(password):
+        raise HTTPException(400, detail=v)
+
 
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -55,13 +63,14 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
-# --> Post Creation <-- #TODO: Unmerge File Upload from Create Post
+# --> Post Creation <--
 @app.post("/create_post")
 async def create_post(post_info: Post, user: User = Depends(get_current_active_user)) -> dict:
 
-    #TODO: --> VALIDATION
-
     user_email = user.model_dump()['email']
+
+    if v := validate.post(post_info):
+        raise HTTPException(400, detail=v)
 
     post_id = pyrodb.create_post(post_info, user_email)
     return {"status": 200, "detail": "Post created succesfully", "post_id": post_id}
@@ -72,10 +81,8 @@ async def upload_post_file(identifier: str, file: UploadFile = File(...), user: 
 
     user_email = user.model_dump()['email']
 
-    #TODO: --> VALIDATION
-
-    if file.filename[-4::] != '.jar':
-        raise HTTPException(400, detail="The file must be a jar")
+    if v := validate.file(file):
+        raise HTTPException(400, detail=v)
     
     pyrodb.create_post_plugin(identifier, user_email, file)
     return {"status": 200, "detail": "File added to the post succesfully"}
