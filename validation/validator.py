@@ -18,10 +18,13 @@ class Validate():
         min_lenght = 3
 
         if not username.isalnum():
+            print(username, username.isalnum())
             return "Username can only have Letters and Numbers"
         
         elif not self.credential_lenght(username, max_lenght, min_lenght):
             return "Username must have between 3 and 25 characters"
+        
+        return False
 
     def email(self, email: str):
         invalid_chars = r'\#!$%¨&*()-=+[{]}|'

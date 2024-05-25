@@ -18,6 +18,9 @@ def signup_for_account(form_data: UserInSignup):
 
     form_data = form_data.model_dump()
 
+    if v:= validate.username(form_data["username"]):
+        raise HTTPException(400, detail=v)
+
     if v := validate.email(form_data["email"]):
         raise HTTPException(400, detail=v)
 
