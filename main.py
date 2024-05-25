@@ -66,7 +66,7 @@ async def verify_user(key: str, user: User = Depends(get_current_active_user)):
     user_data = user.model_dump()
     user_key = user_data["key"]
 
-    if isVerified := user_data["isVerified"]:
+    if user_data["isVerified"]:
         raise HTTPException(400, detail="User already verified!")
     
     if key == user_key:
