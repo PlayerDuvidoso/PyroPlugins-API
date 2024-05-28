@@ -8,6 +8,7 @@ from os import remove, mkdir, scandir, path
 from shutil import rmtree
 import pendulum
 from uuid import uuid4
+from jose import jwt
 
 # --> MongoDB Stuff <--
 uri = config("URI_LINK")
@@ -25,6 +26,8 @@ cache = []
 
 
 # --> Encryption <--
+SECRET_KEY = config("SECRET_KEY")
+ALGORITHM = config("ALGORITHM")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password):
@@ -44,10 +47,12 @@ def add_user(username: str, email: str, password: str):
     hashed_password = get_password_hash(password)
     key = str(uuid4())
     user = UserInDB(username=username, email=email, key=key, hashed_password=hashed_password).model_dump()
+    to_encode = {"email": email, "key": key}
+    verification_code = jwt.encode(to_encode, SECRET_KEY, ALGORITHM)
     if users.find_one({"email": user['email']}):
         return False
     users.insert_one(user)
-    return True
+    return verification_code
 
 def append_post_to_owner(user_email: str, post_identifier: str):
     user = users.find_one({'email': user_email})

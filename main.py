@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
@@ -6,10 +6,12 @@ from models.models import *
 import pyrodb
 from auth.auth import *
 from validation.validator import Validate
+from emails.emails import Emails
 
 
 app = FastAPI()
 validate = Validate()
+emails = Emails()
 
 
 # --> Authentication Routes <--
@@ -28,7 +30,8 @@ def signup_for_account(form_data: UserInSignup):
         raise HTTPException(400, detail=v)
 
     try:
-        if pyrodb.add_user(**form_data):
+        if code := pyrodb.add_user(**form_data):
+            emails.send_verification(form_data["email"], code)
             return {"status": 200, "detail": "Registered Succesfully!"}
         raise HTTPException(400, detail="Email in already in use!")
     except:
@@ -60,13 +63,16 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.post("/verify_user/{key}", tags=["authentication"])
-async def verify_user(key: str, user: User = Depends(get_current_active_user)):
+@app.get("/verify_user/{code}", tags=["authentication"])
+async def verify_user(code: str):
 
-    user_data = user.model_dump()
-    user_key = user_data["key"]
+    codeData = jwt.decode(code, SECRET_KEY, ALGORITHM)
+    key = codeData["key"]
 
-    if user_data["isVerified"]:
+    dbData = pyrodb.get_user(codeData["email"]).model_dump()
+    user_key = dbData["key"]
+
+    if dbData["isVerified"]:
         raise HTTPException(400, detail="User already verified!")
     
     if key == user_key:

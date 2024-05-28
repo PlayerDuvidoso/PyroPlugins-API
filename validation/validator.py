@@ -1,6 +1,7 @@
 from models.models import *
 from fastapi import UploadFile
 
+
 class Validate():
     
     def credential_lenght(self, credential: str, max_lenght: int = 100, min_lenght: int = 2) -> bool:
