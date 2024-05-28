@@ -88,6 +88,16 @@ async def verify_user(code: str):
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
+@app.get("/users/{identifier}", response_model=UserProfile)
+async def read_user(identifier: str):
+
+    user = pyrodb.get_user_by_post(identifier)
+
+    if not user:
+        raise HTTPException(400, detail="Invalid Post!")
+
+    return user
+
 
 # --> Post Creation <--
 @app.post("/create_post")

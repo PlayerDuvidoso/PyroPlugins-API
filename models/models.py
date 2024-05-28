@@ -27,6 +27,9 @@ class UserInDB(User):
 class UserInSignup(User):
     password: str
 
+class UserProfile(BaseModel):
+    username: str
+    posts: list
 
 
 # --> Plugin File Models <--

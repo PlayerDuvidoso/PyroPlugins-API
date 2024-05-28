@@ -38,10 +38,16 @@ def get_password_hash(password):
 
 
 # --> User Handling <--
-def get_user(email: str) -> UserInDB:
+def get_user(email: str):
     user = users.find_one({'email': email})
     if user:
         return UserInDB(**user)
+    
+def get_user_by_post(identifier: str) -> UserInDB:
+    user: dict = users.find_one({'posts': [identifier]})
+    if user:
+        return UserProfile(username=user["username"], posts=user["posts"])
+    return user
 
 def add_user(username: str, email: str, password: str):
     hashed_password = get_password_hash(password)
