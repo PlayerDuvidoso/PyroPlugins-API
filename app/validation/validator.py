@@ -1,4 +1,4 @@
-from models.models import *
+from app.models.models import *
 from fastapi import UploadFile
 
 
