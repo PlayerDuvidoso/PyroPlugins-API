@@ -2,7 +2,7 @@ from decouple import config
 from fastapi import HTTPException, UploadFile
 from pymongo.mongo_client import MongoClient
 from passlib.context import CryptContext
-from models.models import *
+from app.models.models import *
 from gridfs import GridFS
 from os import remove, mkdir, scandir, path
 from shutil import rmtree
@@ -71,7 +71,6 @@ def append_post_to_owner(user_email: str, post_identifier: str):
     
 def verify_user(key) -> None:
     users.update_one({"key": key}, {"$set": {'isVerified': True}})
-
 
 
 # --> Post Handling <--

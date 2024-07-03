@@ -1,5 +1,5 @@
-import pyrodb
-from models.models import * 
+import app.models.pyrodb as pyrodb
+from app.models.models import * 
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import HTTPException, Depends, status
